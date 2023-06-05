@@ -15,9 +15,11 @@
 package colly
 
 import (
+	"compress/gzip"
 	"crypto/sha1"
 	"encoding/gob"
 	"encoding/hex"
+	"errors"
 	"io"
 	"io/ioutil"
 	"math/rand"
@@ -29,8 +31,6 @@ import (
 	"sync"
 	"time"
 
-	"compress/gzip"
-
 	"github.com/gobwas/glob"
 )
 
@@ -38,6 +38,7 @@ type httpBackend struct {
 	LimitRules []*LimitRule
 	Client     *http.Client
 	lock       *sync.RWMutex
+	stop       bool
 }
 
 type checkHeadersFunc func(req *http.Request, statusCode int, header http.Header) bool
@@ -167,18 +168,27 @@ func (h *httpBackend) Cache(request *http.Request, bodySize int, checkHeadersFun
 	return resp, os.Rename(filename+"~", filename)
 }
 
+func (h *httpBackend) Stop() {
+	h.stop = true
+}
+
 func (h *httpBackend) Do(request *http.Request, bodySize int, checkHeadersFunc checkHeadersFunc) (*Response, error) {
 	r := h.GetMatchingRule(request.URL.Host)
 	if r != nil {
 		r.waitChan <- true
 		defer func(r *LimitRule) {
-			randomDelay := time.Duration(0)
-			if r.RandomDelay != 0 {
-				randomDelay = time.Duration(rand.Int63n(int64(r.RandomDelay)))
+			if !h.stop {
+				randomDelay := time.Duration(0)
+				if r.RandomDelay != 0 {
+					randomDelay = time.Duration(rand.Int63n(int64(r.RandomDelay)))
+				}
+				time.Sleep(r.Delay + randomDelay)
 			}
-			time.Sleep(r.Delay + randomDelay)
 			<-r.waitChan
 		}(r)
+	}
+	if h.stop {
+		return nil, errors.New("aborted")
 	}
 
 	res, err := h.Client.Do(request)

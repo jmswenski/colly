@@ -40,8 +40,8 @@ import (
 	"github.com/PuerkitoBio/goquery"
 	"github.com/antchfx/htmlquery"
 	"github.com/antchfx/xmlquery"
-	"github.com/gocolly/colly/v2/debug"
-	"github.com/gocolly/colly/v2/storage"
+	"github.com/jmswenski/colly/v2/debug"
+	"github.com/jmswenski/colly/v2/storage"
 	"github.com/kennygrant/sanitize"
 	whatwgUrl "github.com/nlnwa/whatwg-url/url"
 	"github.com/temoto/robotstxt"
@@ -521,6 +521,10 @@ func (c *Collector) Visit(URL string) error {
 // HasVisited checks if the provided URL has been visited
 func (c *Collector) HasVisited(URL string) (bool, error) {
 	return c.checkHasVisited(URL, nil)
+}
+
+func (c *Collector) Stop() {
+	c.backend.Stop()
 }
 
 // HasPosted checks if the provided URL and requestData has been visited
